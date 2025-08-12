@@ -98,7 +98,7 @@ async function handleModels (apiKey) {
 const DEFAULT_EMBEDDINGS_MODEL = "text-embedding-004";
 // handleEmbeddings 函数
 async function handleEmbeddings (req, apiKey) {
-  // --- 这部分代码保持不变 ---
+  // --- 模型和输入处理 ---
   if (typeof req.model !== "string") {
     throw new HttpError("model is not specified", 400);
   }
@@ -115,44 +115,31 @@ async function handleEmbeddings (req, apiKey) {
     req.input = [ req.input ];
   }
 
-  // <<< 步骤 1: 构建并存储最终的请求体 >>>
-  const finalRequestBody = {
-    "requests": req.input.map(text => {
-      // 构建每个单独的 embedding 请求
-      const geminiRequest = {
-        model,
-        content: { parts: [{ text }] }, // 确认 parts 是一个数组
-      };
-
-      // 从 OpenAI 请求中读取 dimensions 参数
-      if (req.dimensions) {
-        geminiRequest.outputDimensionality = req.dimensions;
-      }
-
-      // 从 extra_body 中读取 task_type 参数
-      if (req.task_type) {
-          geminiRequest.taskType = req.task_type.toUpperCase();
-      }
-
-      return geminiRequest;
-    })
-  };
-
-  // <<< 步骤 2: 打印请求体到日志中进行调试 >>>
-  // 这个日志会出现在你的 Cloudflare Worker 或其他 serverless 平台的日志界面
-  console.log(
-    "DEBUG: Final request body being sent to Google API:", 
-    JSON.stringify(finalRequestBody, null, 2)
-  );
-
-  // <<< 步骤 3: 使用我们刚刚创建的变量发送请求 >>>
+  // --- 构建并发送请求 ---
   const response = await fetch(`${BASE_URL}/${API_VERSION}/${model}:batchEmbedContents`, {
     method: "POST",
     headers: makeHeaders(apiKey, { "Content-Type": "application/json" }),
-    body: JSON.stringify(finalRequestBody) // 确保这里发送的是我们打印的同一个对象
+    body: JSON.stringify({
+      "requests": req.input.map(text => {
+        const geminiRequest = {
+          model,
+          content: { parts: [{ text }] },
+        };
+
+        if (req.dimensions) {
+          geminiRequest.outputDimensionality = req.dimensions;
+        }
+
+        if (req.task_type) { // 从顶层读取 task_type
+          geminiRequest.taskType = req.task_type.toUpperCase();
+        }
+
+        return geminiRequest;
+      })
+    })
   });
 
-  // --- 这部分响应处理代码保持不变 ---
+  // --- 响应处理 ---
   let { body } = response;
   if (response.ok) {
     const { embeddings } = JSON.parse(await response.text());
