@@ -116,11 +116,26 @@ async function handleEmbeddings (req, apiKey) {
     method: "POST",
     headers: makeHeaders(apiKey, { "Content-Type": "application/json" }),
     body: JSON.stringify({
-      "requests": req.input.map(text => ({
-        model,
-        content: { parts: { text } },
-        outputDimensionality: req.dimensions,
-      }))
+      "requests": req.input.map(text => {
+        // 构建每个单独的 embedding 请求
+        const geminiRequest = {
+          model,
+          content: { parts: [{ text }] }, // Google API 推荐 parts 是一个数组
+        };
+
+        // 从 OpenAI 请求中读取 dimensions 参数
+        if (req.dimensions) {
+          geminiRequest.outputDimensionality = req.dimensions;
+        }
+
+        // 从 extra_body 中读取 task_type 参数
+        // 这就要求客户端像这样发送: extra_body: { "task_type": "SEMANTIC_SIMILARITY" }
+        if (req.extra_body?.task_type) {
+            geminiRequest.taskType = req.extra_body.task_type.toUpperCase();
+        }
+
+        return geminiRequest;
+      })
     })
   });
   let { body } = response;
