@@ -130,8 +130,8 @@ async function handleEmbeddings (req, apiKey) {
       }
 
       // 从 extra_body 中读取 task_type 参数
-      if (req.extra_body?.task_type) {
-          geminiRequest.taskType = req.extra_body.task_type.toUpperCase();
+      if (req.task_type) {
+          geminiRequest.taskType = req.task_type.toUpperCase();
       }
 
       return geminiRequest;
